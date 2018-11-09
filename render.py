@@ -8,12 +8,9 @@ N_CTRL_PTS = 8
 
 
 env = CarRacing()
-env.seed(3)
 env.reset()
 env2 = CarRacing()
-env2.seed(3)
 env2.reset()
-np.random.seed(3)
 
 
 # Fitness function

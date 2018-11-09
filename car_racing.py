@@ -114,7 +114,7 @@ class CarRacing(gym.Env, EzPickle):
 
     def __init__(self):
         EzPickle.__init__(self)
-        self.seed(3)
+        self.seed(5)
         self.contactListener_keepref = FrictionDetector(self)
         self.world = Box2D.b2World((0,0), contactListener=self.contactListener_keepref)
         self.viewer = None

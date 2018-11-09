@@ -61,9 +61,7 @@ def measure_fitness(dnas):
 # Entry function for child processes
 def process_entry(task_queue, result_queue):
     penv = CarRacing()
-    penv.seed(5)
     penv.reset()
-    np.random.seed(5)
 
     while True:
         i, dna = task_queue.get()
