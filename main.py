@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import os, sys
 import numpy as np
 import pickle
@@ -11,16 +13,16 @@ NTHREADS = 3
 POP = 100
 MUTATION_RATE = 1 # How many matrix coefficients are expected to be mutated
 N_CTRL_PTS = 8
-MLP_LAYERS = (N_CTRL_PTS + 6, 8, 4)
+MLP_LAYERS = (N_CTRL_PTS + 6, 10, 4)
 SIGMA = 0.07      # mutation magnitude - might be dynamically tweaked
                   # 95% will have mutation between -2*sigma and 2*sigma
 
-np.random.seed(11)
+np.random.seed(13)
 task_queue, result_queue = Queue(), Queue()
 
 
 # Fitness function
-def fitness(env, dna, render=False):
+def fitness(env, dna):
     _, _, done, state  = env.fast_reset()
     
     [reward, on_road, laps] = state[3:6]
@@ -40,8 +42,6 @@ def fitness(env, dna, render=False):
             max_reward = reward
             max_reward_step = step
         step += 1
-        if render:
-            env.render()
     return max_reward
 
 # Utility to get a percentage of the population in absolute numbers
@@ -107,6 +107,7 @@ def initialize_dnas():
 #
 def mp_n_tournaments(n):
     global dnas, fitnesses, indices
+    replacements = 0
     np.random.shuffle(indices)
     children = [copy.deepcopy(dnas[i]) for i in indices[:n]]
     for child in children:
@@ -116,6 +117,8 @@ def mp_n_tournaments(n):
         other = np.random.randint(POP)
         if child_fit > fitnesses[other]:
             dnas[other], fitnesses[other] = child, child_fit
+            replacements += 1
+    return replacements
 
 def replace_with_fittest(fittest):
     global dnas, fitnesses
@@ -149,14 +152,14 @@ if __name__ == '__main__':
         last_fittest_dna = copy.deepcopy(dnas[-1])
 
 
-    print('               Fitnesses')
-    print('{:4}  {:>8} {:>8} {:>8} {:>8}'.format('Iter', '100 %ile', '75 %ile', '50 %ile', '25 %ile'))
+    print('     |           Fitnesses                  |     Replacements')
+    print('{:4} |  {:>8} {:>8} {:>8} {:>8} |'.format('Iter', '100 %ile', '75 %ile', '50 %ile', '25 %ile'))
 
     f = open('saved_dnas', 'wb', buffering=0)
     # Main loop
     while True:
         # Selection
-        mp_n_tournaments(POP)
+        replacements = mp_n_tournaments(POP)
 
         # Order by ascending fitness
         idx = np.argsort(fitnesses)
@@ -167,8 +170,9 @@ if __name__ == '__main__':
         history.append(fitnesses)
 
         epoch += 1
-        print('{:4}  {:8.2f} {:8.2f} {:8.2f} {:8.2f}'.format(
-            epoch, fitnesses[-1], fitnesses[pct(75)], fitnesses[pct(50)], fitnesses[pct(25)]))
+        print('{:4}    {:8.2f} {:8.2f} {:8.2f} {:8.2f}       {:4.1f}%'.format(
+            epoch, fitnesses[-1], fitnesses[pct(75)], fitnesses[pct(50)], fitnesses[pct(25)], 100*replacements/POP)
+            )
 
         if epoch % 5 == 0:
             # Serialize

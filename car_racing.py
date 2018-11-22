@@ -7,7 +7,7 @@ from Box2D.b2 import (edgeShape, circleShape, fixtureDef, polygonShape, revolute
 import gym
 from gym import wrappers
 from gym import spaces
-from car_dynamics import Car
+from gym.envs.box2d.car_dynamics import Car
 from gym.utils import colorize, seeding, EzPickle
 
 import pyglet
