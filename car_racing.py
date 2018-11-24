@@ -66,9 +66,9 @@ BORDER_MIN_COUNT = 4
 
 ROAD_COLOR = [0.4, 0.4, 0.4]
 
+# Class used to communicate the state to the neural net
 class MyState:
     def __init__(self):
-        # Do not change the order of the attributes
         self.angle_deltas = None
         self.reward       = None
         self.on_road      = None
@@ -116,11 +116,13 @@ class FrictionDetector(contactListener):
         if begin:
             obj.tiles.add(tile)
             #print(tile.road_friction, "ADD", len(obj.tiles))
-            #TODO use tile.index_on_track
-            if not tile.road_visited:
-                tile.road_visited = True
+            if tile.index_on_track == self.env.next_road_tile:
                 self.env.reward += 1000.0/len(self.env.track)
                 self.env.tile_visited_count += 1
+                self.env.next_road_tile += 1
+                if self.env.next_road_tile >= len(self.env.road):
+                    self.env.next_road_tile = 0
+                    self.env.laps += 1
         else:
             obj.tiles.remove(tile)
             #print(tile.road_friction, "DEL", len(obj.tiles)) # -- should delete to zero when on grass (this works)
@@ -155,9 +157,9 @@ class CarRacing(gym.Env, EzPickle):
         self.angles = None
         self.angle_deltas = None
         self.original_road_poly = None
-        self.cursor = 0
         self.indices = None
         self.my_state = MyState()
+        self.next_road_tile = 0
 
 
     def seed(self, seed=None):
@@ -325,7 +327,7 @@ class CarRacing(gym.Env, EzPickle):
         self.car2 = None
         self.laps = 0
         self.on_road = True
-        self.cursor = 0
+        self.next_road_tile = 0
 
         self.reward = 0.0
         self.prev_reward = 0.0
@@ -345,7 +347,7 @@ class CarRacing(gym.Env, EzPickle):
         self.car2 = None
         self.laps = 0
         self.on_road = True
-        self.cursor = 0
+        self.next_road_tile = 0
 
         self._destroy()
         self.reward = 0.0
@@ -395,39 +397,30 @@ class CarRacing(gym.Env, EzPickle):
 
         ###############################
 
-        while self.road[self.cursor].road_visited:
-            self.road[(self.cursor - 10) % len(self.road)].road_visited = False
-            self.cursor += 1
-            if self.cursor >= len(self.road):
-                self.cursor = 0
-                self.laps += 1
-
-
-        v1 = self.outward_vectors[self.cursor - 2]
-        v2 = np.array(self.car.hull.position) - self.ctrl_pts[self.cursor - 1]
-
+        v1 = self.outward_vectors[self.next_road_tile - 2]
+        v2 = np.array(self.car.hull.position) - self.ctrl_pts[self.next_road_tile - 1]
         off_center  = np.dot(v1, v2)
         angular_vel = self.car.hull.angularVelocity
         vel         = self.car.hull.linearVelocity
         true_speed  = np.linalg.norm(vel)
-        car_angle   = self.car.hull.angle - self.angles[self.cursor]
+        car_angle   = self.car.hull.angle - self.angles[self.next_road_tile]
         wheel_angle = self.car.wheels[0].joint.angle
-        vel_angle   = math.atan2(vel[1], vel[0]) - (self.angles[self.cursor] + np.pi/2)
+        vel_angle   = math.atan2(vel[1], vel[0]) - (self.angles[self.next_road_tile] + np.pi/2)
         if np.linalg.norm(vel) < 0.2:
             vel_angle = 0
 
         wheel_angle, car_angle, vel_angle = standardize_angle(wheel_angle), standardize_angle(car_angle), standardize_angle(vel_angle)
 
         tip = np.array((self.car.wheels[0].position + self.car.wheels[1].position) / 2)
-        p1 = self.ctrl_pts[self.cursor-1]
-        p2 = self.ctrl_pts[self.cursor-2]
+        p1 = self.ctrl_pts[self.next_road_tile-1]
+        p2 = self.ctrl_pts[self.next_road_tile-2]
         u = (p1 - p2) / TRACK_DETAIL_STEP
         v = (tip - p2)/ TRACK_DETAIL_STEP
         interp = np.dot(v, u)
         interp_angle_deltas = np.interp(self.indices + interp, self.indices, self.angle_deltas)
 
-        self.my_state.angle_deltas = np.roll(interp_angle_deltas, -self.cursor)
-        #self.my_state.angle_deltas = np.roll(self.angle_deltas, -self.cursor)
+        self.my_state.angle_deltas = np.roll(interp_angle_deltas, -self.next_road_tile)
+        #self.my_state.angle_deltas = np.roll(self.angle_deltas, -self.next_road_tile)
         self.my_state.reward       = self.reward
         self.my_state.on_road      = self.on_road
         self.my_state.laps         = self.laps
@@ -567,7 +560,7 @@ class CarRacing(gym.Env, EzPickle):
             gl.glPointSize(7.0)
             gl.glBegin(gl.GL_POINTS)
             gl.glColor4f(1, 0, 1, 1)
-            for i in range(self.cursor, self.cursor+LOOK_AHEAD):
+            for i in range(self.next_road_tile, self.next_road_tile+LOOK_AHEAD):
                 a, b, x, y = self.track[i % len(self.track)]
                 gl.glVertex3f(x, y, 0.9)
             gl.glEnd()
@@ -575,7 +568,7 @@ class CarRacing(gym.Env, EzPickle):
             # Draw angles
             gl.glLineWidth(3.0)
             gl.glColor4f(0, 1, 0, 1)
-            for i in range(self.cursor, self.cursor+LOOK_AHEAD):
+            for i in range(self.next_road_tile, self.next_road_tile+LOOK_AHEAD):
                 a, b, x, y = self.track[i % len(self.track)]
                 gl.glBegin(gl.GL_LINES)
                 gl.glVertex3f(x, y, 0.9)
@@ -590,13 +583,13 @@ class CarRacing(gym.Env, EzPickle):
             tip = np.array((self.car.wheels[0].position + self.car.wheels[1].position) / 2)
             gl.glVertex3f(*tip, 0.5)
             gl.glColor4f(1, 0, 0, 1)
-            gl.glVertex3f(*self.ctrl_pts[self.cursor - 1], 1)
+            gl.glVertex3f(*self.ctrl_pts[self.next_road_tile - 1], 1)
             gl.glColor4f(1, 0, 0, 1)
-            gl.glVertex3f(*self.ctrl_pts[self.cursor - 2], 1)
+            gl.glVertex3f(*self.ctrl_pts[self.next_road_tile - 2], 1)
             gl.glEnd()
 
-            p1 = self.ctrl_pts[self.cursor-1]
-            p2 = self.ctrl_pts[self.cursor-2]
+            p1 = self.ctrl_pts[self.next_road_tile-1]
+            p2 = self.ctrl_pts[self.next_road_tile-2]
             u = (p1 - p2) / TRACK_DETAIL_STEP
             v = (tip - p2)/ TRACK_DETAIL_STEP
             interp = np.dot(v, u)
@@ -608,7 +601,7 @@ class CarRacing(gym.Env, EzPickle):
 
             gl.glBegin(gl.GL_POINTS)
             gl.glColor4f(0, 1, 1, 1)
-            for i in range(self.cursor, self.cursor+LOOK_AHEAD):
+            for i in range(self.next_road_tile, self.next_road_tile+LOOK_AHEAD):
                 gl.glVertex3f(*new_ctrl[i % len(self.ctrl_pts)], 0.9)
             gl.glEnd()
 

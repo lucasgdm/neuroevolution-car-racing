@@ -12,14 +12,15 @@ An evolutionary algorithm built using an adapted version of [OpenAI's CarRacing-
 Install swig (needed for Box2D to work)  
 `$ apt install swig`
 
-Install pip dependencies (preferably using a virtual environment)  
+Install pip dependencies ([preferably using a virtual environment](https://docs.python.org/3/tutorial/venv.html))  
 `$ pip install -r requirements.txt`
 
-Run  
-`$ python3 main.py`
-
-...Or just render the best neural net  
+Render the best neural net  
 `$ python3 render.py`
 
-...Or play against it  
+... Or play against it (use arrow keys to move, and press enter to start over)  
 `$ python3 play_against.py`
+
+... Or run the algorithm  
+`$ python3 main.py`
+
