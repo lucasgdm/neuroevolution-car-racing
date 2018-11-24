@@ -66,6 +66,25 @@ BORDER_MIN_COUNT = 4
 
 ROAD_COLOR = [0.4, 0.4, 0.4]
 
+class MyState:
+    def __init__(self):
+        # Do not change the order of the attributes
+        self.angle_deltas = None
+        self.reward       = None
+        self.on_road      = None
+        self.laps         = None
+
+        self.wheel_angle  = None
+        self.car_angle    = None
+        self.angular_vel  = None
+        self.true_speed   = None
+        self.off_center   = None
+        self.vel_angle    = None
+
+    def as_array(self, n):
+        return np.append(self.angle_deltas[:n], [self.wheel_angle, self.car_angle, self.angular_vel, self.true_speed, self.off_center, self.vel_angle])
+
+
 def standardize_angle(theta):
     return np.remainder(theta + np.pi, 2*np.pi) - np.pi
 
@@ -97,6 +116,7 @@ class FrictionDetector(contactListener):
         if begin:
             obj.tiles.add(tile)
             #print(tile.road_friction, "ADD", len(obj.tiles))
+            #TODO use tile.index_on_track
             if not tile.road_visited:
                 tile.road_visited = True
                 self.env.reward += 1000.0/len(self.env.track)
@@ -136,6 +156,8 @@ class CarRacing(gym.Env, EzPickle):
         self.angle_deltas = None
         self.original_road_poly = None
         self.cursor = 0
+        self.indices = None
+        self.my_state = MyState()
 
 
     def seed(self, seed=None):
@@ -166,10 +188,6 @@ class CarRacing(gym.Env, EzPickle):
                 rad = 1.5*TRACK_RAD
             checkpoints.append( (alpha, rad*math.cos(alpha), rad*math.sin(alpha)) )
 
-        #print "\n".join(str(h) for h in checkpoints)
-        #self.road_poly = [ (    # uncomment this to see checkpoints
-        #    [ (tx,ty) for a,tx,ty in checkpoints ],
-        #    (0.7,0.7,0.9) ) ]
         self.road = []
 
         # Go from one checkpoint to another to create track
@@ -276,6 +294,7 @@ class CarRacing(gym.Env, EzPickle):
                 shape=polygonShape(vertices=[road1_l, road1_r, road2_r, road2_l])
                 ))
             t.userData = t
+            t.index_on_track = i
             c = 0.01*(i%3)
             t.color = [ROAD_COLOR[0] + c, ROAD_COLOR[1] + c, ROAD_COLOR[2] + c]
             t.road_visited = False
@@ -291,12 +310,15 @@ class CarRacing(gym.Env, EzPickle):
                 b2_r = (x2 + side*(TRACK_WIDTH+BORDER)*math.cos(beta2), y2 + side*(TRACK_WIDTH+BORDER)*math.sin(beta2))
                 self.road_poly.append(( [b1_l, b1_r, b2_r, b2_l], (1,1,1) if i%2==0 else (1,0,0) ))
         self.track = track
+        #####
         self.original_road_poly = copy.deepcopy(self.road_poly)
-        self.ctrl_pts = np.array(list(map(lambda x: x[2:], self.track)))
-        self.angles = list(map(lambda x: x[1], self.track))
-        self.outward_vectors = [np.array([np.cos(theta), np.sin(theta)]) for theta in self.angles]
-        angle_deltas = self.angles - np.roll(self.angles, 1)
-        self.angle_deltas = np.array(list(map(standardize_angle, angle_deltas)))
+        self.ctrl_pts           = np.array(list(map(lambda x: x[2:], self.track)))
+        self.angles             = list(map(lambda x: x[1], self.track))
+        self.outward_vectors    = [np.array([np.cos(theta), np.sin(theta)]) for theta in self.angles]
+        angle_deltas            = (self.angles - np.roll(self.angles, 1))
+        self.angle_deltas       = np.array(list(map(standardize_angle, angle_deltas)))
+        self.indices            = np.array(range(len(self.ctrl_pts)))
+        #####
         return True
 
     def fast_reset(self):
@@ -352,7 +374,7 @@ class CarRacing(gym.Env, EzPickle):
         self.world.Step(1.0/FPS, 6*30, 2*30)
         self.t += 1.0/FPS
 
-        #self.state = self.render("state_pixels") # not using this
+        #self.state = self.render("state_pixels") # Unused and hinders performance
         self.state = 0
 
         step_reward = 0
@@ -380,34 +402,52 @@ class CarRacing(gym.Env, EzPickle):
                 self.cursor = 0
                 self.laps += 1
 
-        v1 = self.outward_vectors[self.cursor - 1]
-        v2 = np.array(self.car.hull.position) - self.ctrl_pts[self.cursor - 1]
-        off_center = np.dot(v1, v2)*0.1
 
+        v1 = self.outward_vectors[self.cursor - 2]
+        v2 = np.array(self.car.hull.position) - self.ctrl_pts[self.cursor - 1]
+
+        off_center  = np.dot(v1, v2)
         angular_vel = self.car.hull.angularVelocity
-        vel = self.car.hull.linearVelocity
-        true_speed = 0.02 * np.linalg.norm(vel)#np.sqrt(np.square(vel[0]) + np.square(vel[1])) * 0.02
-        car_angle = self.car.hull.angle - self.angles[self.cursor]
-        wheel_angle = self.car.wheels[0].joint.angle + car_angle
-        vel_angle = math.atan2(vel[1], vel[0]) - (self.angles[self.cursor] + np.pi/2)
-        if np.linalg.norm(vel) < 0.5:
+        vel         = self.car.hull.linearVelocity
+        true_speed  = np.linalg.norm(vel)
+        car_angle   = self.car.hull.angle - self.angles[self.cursor]
+        wheel_angle = self.car.wheels[0].joint.angle
+        vel_angle   = math.atan2(vel[1], vel[0]) - (self.angles[self.cursor] + np.pi/2)
+        if np.linalg.norm(vel) < 0.2:
             vel_angle = 0
 
         wheel_angle, car_angle, vel_angle = standardize_angle(wheel_angle), standardize_angle(car_angle), standardize_angle(vel_angle)
 
-        return 0, step_reward, False, \
-                    (self.ctrl_pts.take(range(self.cursor, self.cursor+LOOK_AHEAD), mode='wrap'),
-                    self.car.hull.position,
-                    self.angle_deltas.take(range(self.cursor, self.cursor+LOOK_AHEAD), mode='wrap'),
-                    self.reward,
-                    self.on_road,
-                    self.laps,
-                    wheel_angle,
-                    car_angle,
-                    angular_vel,
-                    true_speed,
-                    off_center,
-                    vel_angle)
+        tip = np.array((self.car.wheels[0].position + self.car.wheels[1].position) / 2)
+        p1 = self.ctrl_pts[self.cursor-1]
+        p2 = self.ctrl_pts[self.cursor-2]
+        u = (p1 - p2) / TRACK_DETAIL_STEP
+        v = (tip - p2)/ TRACK_DETAIL_STEP
+        interp = np.dot(v, u)
+        interp_angle_deltas = np.interp(self.indices + interp, self.indices, self.angle_deltas)
+
+        self.my_state.angle_deltas = np.roll(interp_angle_deltas, -self.cursor)
+        #self.my_state.angle_deltas = np.roll(self.angle_deltas, -self.cursor)
+        self.my_state.reward       = self.reward
+        self.my_state.on_road      = self.on_road
+        self.my_state.laps         = self.laps
+        self.my_state.true_speed   = true_speed
+        self.my_state.off_center   = off_center
+        self.my_state.wheel_angle  = wheel_angle
+        self.my_state.car_angle    = car_angle
+        self.my_state.angular_vel  = angular_vel
+        self.my_state.vel_angle    = vel_angle
+
+        # Normalize scales
+        self.my_state.angle_deltas *= 2.3
+        self.my_state.true_speed   /= 100
+        self.my_state.off_center   /= TRACK_WIDTH
+        self.my_state.wheel_angle  *= 2.1
+        self.my_state.car_angle    *= 1.5
+        self.my_state.vel_angle    *= 1.5
+        self.my_state.angular_vel  /= 3.74
+
+        return 0, step_reward, False, self.my_state
 
         ###############################
 
@@ -445,7 +485,8 @@ class CarRacing(gym.Env, EzPickle):
         if self.car2 is not None:
             self.car2.draw(self.viewer, mode!="state_pixels")
 
-        self.car.draw(self.viewer, mode!="state_pixels")
+        if not DEBUG_DRAWING:
+            self.car.draw(self.viewer, mode!="state_pixels")
 
         arr = None
         win = self.viewer.window
@@ -467,7 +508,7 @@ class CarRacing(gym.Env, EzPickle):
             for geom in self.viewer.onetime_geoms:
                 geom.render()
             t.disable()
-            self.render_indicators(WINDOW_W, WINDOW_H)  # TODO: find why 2x needed, wtf
+            self.render_indicators(WINDOW_W, WINDOW_H)
             image_data = pyglet.image.get_buffer_manager().get_color_buffer().get_image_data()
             arr = np.fromstring(image_data.data, dtype=np.uint8, sep='')
             arr = arr.reshape(VP_H, VP_W, 4)
@@ -522,6 +563,7 @@ class CarRacing(gym.Env, EzPickle):
         #####################################
 
         if DEBUG_DRAWING:
+            # Draw control points
             gl.glPointSize(7.0)
             gl.glBegin(gl.GL_POINTS)
             gl.glColor4f(1, 0, 1, 1)
@@ -529,6 +571,8 @@ class CarRacing(gym.Env, EzPickle):
                 a, b, x, y = self.track[i % len(self.track)]
                 gl.glVertex3f(x, y, 0.9)
             gl.glEnd()
+
+            # Draw angles
             gl.glLineWidth(3.0)
             gl.glColor4f(0, 1, 0, 1)
             for i in range(self.cursor, self.cursor+LOOK_AHEAD):
@@ -539,6 +583,35 @@ class CarRacing(gym.Env, EzPickle):
                 rot = math.pi/2
                 gl.glVertex3f(x+line_len*math.cos(b+rot), y+line_len*math.sin(b+rot), 0.9)
                 gl.glEnd()
+
+            # Interpolation debug
+            gl.glBegin(gl.GL_POINTS)
+            gl.glColor4f(1, 1, 1, 1)
+            tip = np.array((self.car.wheels[0].position + self.car.wheels[1].position) / 2)
+            gl.glVertex3f(*tip, 0.5)
+            gl.glColor4f(1, 0, 0, 1)
+            gl.glVertex3f(*self.ctrl_pts[self.cursor - 1], 1)
+            gl.glColor4f(1, 0, 0, 1)
+            gl.glVertex3f(*self.ctrl_pts[self.cursor - 2], 1)
+            gl.glEnd()
+
+            p1 = self.ctrl_pts[self.cursor-1]
+            p2 = self.ctrl_pts[self.cursor-2]
+            u = (p1 - p2) / TRACK_DETAIL_STEP
+            v = (tip - p2)/ TRACK_DETAIL_STEP
+            interp = np.dot(v, u)
+
+            new_ctrl = np.transpose([
+                    np.interp(self.indices + interp, self.indices, self.ctrl_pts[:,0]),
+                    np.interp(self.indices + interp, self.indices, self.ctrl_pts[:,1]),
+                ])
+
+            gl.glBegin(gl.GL_POINTS)
+            gl.glColor4f(0, 1, 1, 1)
+            for i in range(self.cursor, self.cursor+LOOK_AHEAD):
+                gl.glVertex3f(*new_ctrl[i % len(self.ctrl_pts)], 0.9)
+            gl.glEnd()
+
 
         #####################################
 

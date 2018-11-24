@@ -21,26 +21,21 @@ restart = False
 
 # Fitness function
 def fitness(env, dna, dna2):
-    global N_CTRL_PTS, restart
-    _, _, done, state  = env.fast_reset()
-    _, _, done2, state2  = env2.fast_reset()
+    global restart
+    _, _, _, state  = env.fast_reset()
+    _, _, _, state2  = env2.fast_reset()
 
     max_reward2 = 0
     env2.car.hull.color = (0.2,0.2,0.8)
     
-    [reward, on_road, laps] = state[3:6]
     step = 1
     while True:
         while not restart:
-            angle_deltas2 = state2[2]
-            inp2 = np.append(angle_deltas2[:N_CTRL_PTS], state2[6:12])
-            reaction2 = dna2.feed(inp2) # steer [-1, 1], gas [0, 1], brake [0, 1]
-            _, _, done2, state2 = env2.step(reaction2)
+            reaction2 = dna2.feed(state2.as_array(N_CTRL_PTS))
+            _, _, _, state2 = env2.step(reaction2)
 
-            angle_deltas = state[2]
-            inp = np.append(angle_deltas[:N_CTRL_PTS], state[6:12])
-            reaction = dna.feed(inp) # steer [-1, 1], gas [0, 1], brake [0, 1]
-            _, _, done, state = env.step(user_action)
+            reaction = dna.feed(state.as_array(N_CTRL_PTS))
+            _, _, _, state = env.step(user_action)
 
             step += 1
             env.set_car2(env2.car)
@@ -49,7 +44,6 @@ def fitness(env, dna, dna2):
         env2.fast_reset()
         env2.car.hull.color = (0.2,0.2,0.8)
         restart = False
-
 
 
 dnas = None

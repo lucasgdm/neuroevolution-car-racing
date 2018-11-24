@@ -7,6 +7,7 @@ from concurrent.futures import *
 from mlp import *
 
 N_CTRL_PTS = 8
+LAPS = 2
 
 
 env = CarRacing()
@@ -17,40 +18,34 @@ env2.reset()
 
 # Fitness function
 def fitness(env, dna, dna2):
-    global N_CTRL_PTS
-    _, _, done, state  = env.fast_reset()
-    _, _, done2, state2  = env2.fast_reset()
+    _, _, _, state  = env.fast_reset()
+    _, _, _, state2  = env2.fast_reset()
 
     max_reward2 = 0
     env2.car.hull.color = (0.2,0.2,0.8)
     
-    [reward, on_road, laps] = state[3:6]
     step = 1
     max_reward = 0
     max_reward_step = 0
-    while on_road and laps < 5:
+    while state.on_road and state.laps < 2:
         if step - max_reward_step > 4.5*FPS: # didnt increase the reward fast enough
             break
 
-        angle_deltas2 = state2[2]
-        inp2 = np.append(angle_deltas2[:N_CTRL_PTS], state2[6:12])
-        reaction2 = dna2.feed(inp2) # steer [-1, 1], gas [0, 1], brake [0, 1]
+        reaction2 = dna2.feed(state2.as_array(N_CTRL_PTS))
         _, _, done2, state2 = env2.step(reaction2)
         if not done2:
-            max_reward2 = np.maximum(max_reward2, state2[3])
+            max_reward2 = np.maximum(max_reward2, state2.reward)
 
-        angle_deltas = state[2]
-        inp = np.append(angle_deltas[:N_CTRL_PTS], state[6:12])
-        reaction = dna.feed(inp) # steer [-1, 1], gas [0, 1], brake [0, 1]
-        _, _, done, state = env.step(reaction)
+        reaction = dna.feed(state.as_array(N_CTRL_PTS))
+        _, _, _, state = env.step(reaction)
 
-        [reward, on_road, laps] = state[3:6]
-        if reward > max_reward:
-            max_reward = reward
+        if state.reward > max_reward:
+            max_reward = state.reward
             max_reward_step = step
         step += 1
         env.set_car2(env2.car)
         env.render()
+
     return max_reward, max_reward2
 
 

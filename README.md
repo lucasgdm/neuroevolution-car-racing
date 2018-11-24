@@ -18,5 +18,8 @@ Install pip dependencies (preferably using a virtual environment)
 Run  
 `$ python3 main.py`
 
+...Or just render the best neural net  
+`$ python3 render.py`
+
 ...Or play against it  
 `$ python3 play_against.py`

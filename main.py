@@ -9,13 +9,14 @@ from mlp import *
 from multiprocessing import Process, Pipe, Pool, Queue
 import multiprocessing.sharedctypes
 
-NTHREADS = 3
-POP = 100
-MUTATION_RATE = 1 # How many matrix coefficients are expected to be mutated
-N_CTRL_PTS = 8
-MLP_LAYERS = (N_CTRL_PTS + 6, 10, 4)
-SIGMA = 0.07      # mutation magnitude - might be dynamically tweaked
-                  # 95% will have mutation between -2*sigma and 2*sigma
+NTHREADS      = 3
+POP           = 100
+MUTATION_RATE = 1          # How many matrix coefficients are expected to be mutated
+N_CTRL_PTS    = 8
+MLP_LAYERS    = (N_CTRL_PTS + 6, 10, 4)
+SIGMA         = 0.14/2     # Mutation magnitude - might be dynamically tweaked
+                           # 95% will have mutation between -2*sigma and 2*sigma
+LAPS          = 2
 
 np.random.seed(13)
 task_queue, result_queue = Queue(), Queue()
@@ -25,21 +26,17 @@ task_queue, result_queue = Queue(), Queue()
 def fitness(env, dna):
     _, _, done, state  = env.fast_reset()
     
-    [reward, on_road, laps] = state[3:6]
     step = 1
     max_reward = 0
     max_reward_step = 0
-    while on_road and laps < 5:
+    while state.on_road and state.laps < LAPS:
         if step - max_reward_step > 4.5*FPS: # didnt increase the reward fast enough
             break
-        angle_deltas = state[2]
-        inp = np.append(angle_deltas[:N_CTRL_PTS], state[6:12])
-        reaction = dna.feed(inp) # steer [-1, 1], gas [0, 1], brake [0, 1]
+        reaction = dna.feed(state.as_array(N_CTRL_PTS)) # steer [-1, 1], gas [0, 1], brake [0, 1]
         _, _, done, state = env.step(reaction)
 
-        [reward, on_road, laps] = state[3:6]
-        if reward > max_reward:
-            max_reward = reward
+        if state.reward > max_reward:
+            max_reward = state.reward
             max_reward_step = step
         step += 1
     return max_reward
