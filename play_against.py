@@ -30,7 +30,7 @@ def fitness(env, dna, dna2):
     
     step = 1
     while True:
-        while not restart:
+        while not restart and state.on_road:
             reaction2 = dna2.feed(state2.as_array(N_CTRL_PTS))
             _, _, _, state2 = env2.step(reaction2)
 

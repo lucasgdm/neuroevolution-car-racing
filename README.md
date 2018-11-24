@@ -18,7 +18,7 @@ Install pip dependencies ([preferably using a virtual environment](https://docs.
 Render the best neural net  
 `$ python3 render.py`
 
-... Or play against it (use arrow keys to move, and press enter to start over)  
+... Or play against it (use arrow keys to move and press return to start over. Do not accelerate and steer at the same time)  
 `$ python3 play_against.py`
 
 ... Or run the algorithm  
