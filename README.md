@@ -1,4 +1,4 @@
-# evolutionary-neuralnet-car-racing
+# neuroevolution-car-racing
 
 An evolutionary algorithm built using an adapted version of [OpenAI's CarRacing-v0 challenge](https://gym.openai.com/envs/CarRacing-v0/)
 <p align="center">
