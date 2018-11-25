@@ -7,19 +7,27 @@ An evolutionary algorithm built using an adapted version of [OpenAI's CarRacing-
   </a>
 </p>
 
+The multilayer perceptron receives with the following inputs:
+- The curvature of the road at N sample points ahead of the car
+- Car speed
+- Car angle
+- Speed direction (might diverge from that of the car when it's skidding)
+- Wheel angle
+- Car angular velocity
+- Distance between the car and the center of the road
 
 ## Installing dependencies
-Install swig (needed for Box2D to work)  
+Install swig, which is needed for Box2D to work  
 `$ apt install swig`
 
-Install pip dependencies ([preferably using a virtual environment](https://docs.python.org/3/tutorial/venv.html))  
+Install pip dependencies, [preferably using a virtual environment](https://docs.python.org/3/tutorial/venv.html)  
 `$ pip install -r requirements.txt`
 
 ## Running
 Render the best neural net  
 `$ python3 render.py`
 
-... Or play against it (use arrow keys to move and press return to start over. Do not accelerate and steer at the same time)  
+... Or play against it. Use arrow keys to move and press return key to start over. Do not accelerate and steer at the same time  
 `$ python3 play_against.py`
 
 ... Or run the algorithm  
