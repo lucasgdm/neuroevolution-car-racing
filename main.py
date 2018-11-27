@@ -13,7 +13,7 @@ NTHREADS      = 3
 POP           = 100
 MUTATION_RATE = 1          # How many matrix coefficients are expected to be mutated
 N_CTRL_PTS    = 8
-MLP_LAYERS    = (N_CTRL_PTS + 6, 10, 4)
+MLP_LAYERS    = (N_CTRL_PTS + 6, 12, 10, 4)
 SIGMA         = 0.14/2     # Mutation magnitude - might be dynamically tweaked
                            # 95% will have mutation between -2*sigma and 2*sigma
 LAPS          = 2
@@ -47,7 +47,7 @@ def pct(p):
 
 # Parallel fitness measurement
 def measure_fitness(dnas):
-    fitnesses = np.array([-100] * len(dnas))
+    fitnesses = np.array([-100.0] * len(dnas))
     for item in enumerate(dnas):
         task_queue.put(item)
     for _ in range(len(dnas)):

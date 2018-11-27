@@ -15,7 +15,7 @@ class MyMLP:
         for a, b in zip(layer_sizes[:-1], layer_sizes[1:]):
             mat = np.zeros((a + 1, b + 1))
             mat[-1, -1] = np.infty if activation == 'sigmoid' else 1
-            mat[:, :-1] = np.random.rand(*mat[:, :b].shape) * 0.2 - 0.1
+            mat[:, :-1] = np.random.rand(*mat[:, :b].shape) * 0.5 - 0.25
             self.ws.append(mat)
 
     def feed(self, x):

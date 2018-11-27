@@ -382,7 +382,7 @@ class CarRacing(gym.Env, EzPickle):
         step_reward = 0
         done = False
         if action is not None: # First step without action, called from reset()
-            self.reward -= 0.1
+            self.reward -= 5.0/FPS
             # We actually don't want to count fuel spent, we want car to be faster.
             #self.reward -=  10 * self.car.fuel_spent / ENGINE_POWER
             self.car.fuel_spent = 0.0
