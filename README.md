@@ -7,7 +7,7 @@ An evolutionary algorithm built using an adapted version of [OpenAI's CarRacing-
   </a>
 </p>
 
-The multilayer perceptron receives with the following inputs:
+The multilayer perceptron receives the following inputs:
 - The curvature of the road at N sample points ahead of the car
 - Car speed
 - Car angle
@@ -15,6 +15,12 @@ The multilayer perceptron receives with the following inputs:
 - Wheel angle
 - Car angular velocity
 - Distance between the car and the center of the road
+
+And produces the following outputs:
+- Acceleration
+- Steer left
+- Brake
+- Steer right
 
 ## Installing dependencies
 Install swig, which is needed for Box2D to work  
@@ -30,9 +36,11 @@ Render the best neural net
 ... Or play against it. Use arrow keys to move and press return key to start over. Do not accelerate and steer at the same time  
 `$ python3 play_against.py`
 
-... Or run the algorithm  
+... Or run the evolutionary algorithm  
 `$ python3 main.py`
 
 Remove `saved_dnas` if you want the algorithm to start from scratch  
-`$ rm saved_dnas; python3 main.py`
-
+```
+$ rm saved_dnas  
+$ python3 main.py
+```
